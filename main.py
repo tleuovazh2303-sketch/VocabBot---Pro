@@ -12,7 +12,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 # 2. BOT TOKEN
 TOKEN = "8713961102:AAEjjLuLvXbea4xN3e7cbbxLQY1Ixddx0a8"
 
-# 3. DATABASE (Барлық ойындарға арналған деректер)
+# 3. DATABASE
 WORDS_DB = [
     {"word": "Environment", "phon": "[ɪnˈvaɪrənmənt]", "trans": "Қоршаған орта", "def": "The surroundings in which a person lives.", "ex": "Protect our environment.", "tf_q": "Does 'Environment' mean 'City'?", "tf_a": "false"},
     {"word": "Sustainable", "phon": "[səˈsteɪnəbl]", "trans": "Тұрақты", "def": "Able to continue without harming nature.", "ex": "Solar energy is sustainable.", "tf_q": "Is solar energy sustainable?", "tf_a": "true"},
@@ -27,10 +27,10 @@ QUIZ_DB = [
     {"q": "Which word means 'Very Old'?", "o": ["A) Modern", "B) Ancient", "C) New"], "a": "B", "exp": "Ancient refers to thousands of years ago."}
 ]
 
-# 4. БІРІКТІРІЛГЕН МӘЗІР (MENU)
+# 4. MENU
 MENU = ReplyKeyboardMarkup([
     ["Learn Words 📚", "Quiz 🧠"], 
-    ["Interactive Games 🎮", "Sentence ✍️"], # Осы жерге жаңа батырма қойылды
+    ["Interactive Games 🎮", "Sentence ✍️"], 
     ["Listening 🎧", "True/False ✅"], 
     ["Game 🎮", "Help ❓"]
 ], resize_keyboard=True)
@@ -52,10 +52,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+        
     text = update.message.text.strip()
     state = context.user_data.get("state")
 
-    # --- МӘЗІР БАТЫРМАЛАРЫ (БҰЙРЫҚТАР) ---
+    # --- BUTTON COMMANDS ---
     if text == "Learn Words 📚":
         w = get_unique_item(context, WORDS_DB, "words")
         msg = f"📚 *Word:* {w['word']}\n🔊 *{w['phon']}*\n🇰🇿 *Аударма:* {w['trans']}\n📖 *Def:* {w['def']}\n📝 *Ex:* _{w['ex']}_"
@@ -111,16 +114,16 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"🧐 *True or False?*\n\n{w['tf_q']}", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    # --- ЖАУАПТАРДЫ ТЕКСЕРУ (STATE-BASED) ---
+    # --- ANSWER CHECKING ---
     if state == "QUIZ":
-        if text.upper().startswith(context.user_data.get("ans")):
+        if text.upper().startswith(context.user_data.get("ans", "")):
             await update.message.reply_text("✅ *Correct!*", parse_mode="Markdown")
         else:
             await update.message.reply_text(f"❌ *Wrong.* Answer: {context.user_data.get('ans')}\n{context.user_data.get('exp')}", parse_mode="Markdown")
         context.user_data["state"] = None
 
     elif state in ["GAME", "LISTENING"]:
-        if text.strip().upper() == context.user_data.get("ans"):
+        if text.strip().upper() == context.user_data.get("ans", ""):
             await update.message.reply_text("🎯 *Perfect!* ✅")
         else:
             await update.message.reply_text(f"❌ *Incorrect.* It was: {context.user_data.get('ans')}")
@@ -137,7 +140,6 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
     correct_ans = context.user_data.get("tf_correct_ans")
     if query.data == correct_ans:
         await query.edit_message_text(f"✅ *Correct!* You're right.", parse_mode="Markdown")
