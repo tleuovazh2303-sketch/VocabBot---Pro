@@ -2,41 +2,35 @@ import random
 import logging
 import os
 import io
-import asyncio
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from gtts import gTTS
 from telegram import ReplyKeyboardMarkup, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
-# 1. ТЕХНИКАЛЫҚ БӨЛІМ: Render үшін веб-порт ашу
+# --- RENDER ҮШІН ВЕБ-СЕРВЕР (ҚАТЕ ЖОЮ ҮШІН) ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot is alive")
+        self.wfile.write(b"Bot is running")
 
-def run_health_check():
+def run_server():
     server = HTTPServer(('0.0.0.0', 10000), HealthCheckHandler)
     server.serve_forever()
 
-# 2. Logging setup
+# --- ЛОГИКА ЖӘНЕ БОТ ---
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 TOKEN = "8713961102:AAEjjLuLvXbea4xN3e7cbbxLQY1Ixddx0a8"
 
-# 3. DATABASE
 WORDS_DB = [
     {"word": "Environment", "phon": "[ɪnˈvaɪrənmənt]", "trans": "Қоршаған орта", "def": "The surroundings in which a person lives.", "ex": "Protect our environment.", "tf_q": "Does 'Environment' mean 'City'?", "tf_a": "false"},
     {"word": "Sustainable", "phon": "[səˈsteɪnəbl]", "trans": "Тұрақты", "def": "Able to continue without harming nature.", "ex": "Solar energy is sustainable.", "tf_q": "Is solar energy sustainable?", "tf_a": "true"},
-    {"word": "Independent", "phon": "[ˌɪndɪˈpendənt]", "trans": "Тәуелсіз", "def": "Not controlled by others.", "ex": "Kazakhstan is independent.", "tf_q": "Is Kazakhstan an independent country?", "tf_a": "true"},
-    {"word": "Significant", "phon": "[sɪɡˈnɪfɪkənt]", "trans": "Маңызды", "def": "Having a great meaning.", "ex": "A significant discovery.", "tf_q": "Does 'Significant' mean 'Tiny'?", "tf_a": "false"},
-    {"word": "Knowledge", "phon": "[ˈnɒlɪdʒ]", "trans": "Білім", "def": "Facts gained through experience.", "ex": "Knowledge is power.", "tf_q": "Is knowledge a power?", "tf_a": "true"}
+    {"word": "Independent", "phon": "[ˌɪndɪˈpendənt]", "trans": "Тәуелсіз", "def": "Not controlled by others.", "ex": "Kazakhstan is independent.", "tf_q": "Is Kazakhstan an independent country?", "tf_a": "true"}
 ]
 
 QUIZ_DB = [
-    {"q": "What is the synonym of 'Huge'?", "o": ["A) Tiny", "B) Enormous", "C) Small"], "a": "B", "exp": "Enormous means extremely large."},
-    {"q": "Antonym of 'Success'?", "o": ["A) Failure", "B) Victory", "C) Win"], "a": "A", "exp": "Failure is the opposite of success."},
-    {"q": "Which word means 'Very Old'?", "o": ["A) Modern", "B) Ancient", "C) New"], "a": "B", "exp": "Ancient refers to thousands of years ago."}
+    {"q": "What is the synonym of 'Huge'?", "o": ["A) Tiny", "B) Enormous", "C) Small"], "a": "B", "exp": "Enormous means extremely large."}
 ]
 
 MENU = ReplyKeyboardMarkup([
@@ -69,14 +63,19 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"📚 *Word:* {w['word']}\n🇰🇿 *Аударма:* {w['trans']}", parse_mode="Markdown")
         return
     elif text == "Interactive Games 🎮":
-        await update.message.reply_text("1. Family: https://wordwall.net/resource/16223990\n2. Vocab: https://wordwall.net/resource/16581690\n3. Revision: https://wordwall.net/ru/resource/74390841")
+        games_text = (
+            "Interactive Games for practice:\n\n"
+            "1. Family Members 👨‍👩‍👧‍👦:\nhttps://wordwall.net/resource/16223990\n"
+            "2. Vocabulary Practice 📖:\nhttps://wordwall.net/resource/16581690\n"
+            "3. Revision Game ⚡:\nhttps://wordwall.net/ru/resource/74390841"
+        )
+        await update.message.reply_text(games_text)
         return
     elif text == "Quiz 🧠":
         q = get_unique_item(context, QUIZ_DB, "quiz")
         context.user_data.update({"state": "QUIZ", "ans": q["a"], "exp": q["exp"]})
         await update.message.reply_text(f"🧠 {q['q']}\n" + "\n".join(q["o"]))
         return
-    # ... басқа логикалар осында жалғаса береді ...
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -87,8 +86,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("❌ Wrong!")
 
 if __name__ == '__main__':
-    # Веб-серверді бөлек ағында іске қосу
-    Thread(target=run_health_check, daemon=True).start()
+    # ВЕБ-СЕРВЕРДІ ІСКЕ ҚОСУ
+    Thread(target=run_server, daemon=True).start()
     
     app = ApplicationBuilder().token("8713961102:AAEJjLuLvXbea4xN3e7cbbxLQYlIxddxOa8").build()
     app.add_handler(CommandHandler("start", start))
