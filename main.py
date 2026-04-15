@@ -118,7 +118,7 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text(f"⚠️ *Try again!* Use '{target}' in a sentence.")
         context.user_data["state"] = None
-elif text == "Interactive Games 🎮":
+    elif text == "Interactive Games 🎮":
         games_text = (
             "Interactive Games for practice:\n\n"
             "1. Family Members 👨‍👩‍👧‍👦:\nhttps://wordwall.net/resource/16223990\n\n"
