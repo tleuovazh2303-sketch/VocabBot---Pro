@@ -1,16 +1,18 @@
 import random
 import logging
 import os
+import io
 from gtts import gTTS
 from telegram import ReplyKeyboardMarkup, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
-# Logging setup
+# 1. Logging setup
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
+# 2. BOT TOKEN
 TOKEN = "8713961102:AAEjjLuLvXbea4xN3e7cbbxLQY1Ixddx0a8"
 
-# 1. DATABASE (Барлық ойындарға арналған деректер)
+# 3. DATABASE (Барлық ойындарға арналған деректер)
 WORDS_DB = [
     {"word": "Environment", "phon": "[ɪnˈvaɪrənmənt]", "trans": "Қоршаған орта", "def": "The surroundings in which a person lives.", "ex": "Protect our environment.", "tf_q": "Does 'Environment' mean 'City'?", "tf_a": "false"},
     {"word": "Sustainable", "phon": "[səˈsteɪnəbl]", "trans": "Тұрақты", "def": "Able to continue without harming nature.", "ex": "Solar energy is sustainable.", "tf_q": "Is solar energy sustainable?", "tf_a": "true"},
@@ -25,12 +27,14 @@ QUIZ_DB = [
     {"q": "Which word means 'Very Old'?", "o": ["A) Modern", "B) Ancient", "C) New"], "a": "B", "exp": "Ancient refers to thousands of years ago."}
 ]
 
-# БІРІКТІРІЛГЕН МӘЗІР
+# 4. БІРІКТІРІЛГЕН МӘЗІР (MENU)
 MENU = ReplyKeyboardMarkup([
-    ["Learn Words 📚", "Quiz 🧠"],
-    ["Interactive Games 🎮", "Sentence ✍️"],
-    ["Listening 🎧", "Help ❓"]
+    ["Learn Words 📚", "Quiz 🧠"], 
+    ["Interactive Games 🎮", "Sentence ✍️"], # Осы жерге жаңа батырма қойылды
+    ["Listening 🎧", "True/False ✅"], 
+    ["Game 🎮", "Help ❓"]
 ], resize_keyboard=True)
+
 def get_unique_item(context, db, key):
     used_key = f"used_{key}"
     if used_key not in context.user_data or len(context.user_data[used_key]) >= len(db):
@@ -51,16 +55,28 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     state = context.user_data.get("state")
 
-    # --- МӘЗІР БАТЫРМАЛАРЫ ---
+    # --- МӘЗІР БАТЫРМАЛАРЫ (БҰЙРЫҚТАР) ---
     if text == "Learn Words 📚":
         w = get_unique_item(context, WORDS_DB, "words")
         msg = f"📚 *Word:* {w['word']}\n🔊 *{w['phon']}*\n🇰🇿 *Аударма:* {w['trans']}\n📖 *Def:* {w['def']}\n📝 *Ex:* _{w['ex']}_"
         await update.message.reply_text(msg, parse_mode="Markdown")
+        return
+
+    elif text == "Interactive Games 🎮":
+        games_text = (
+            "Interactive Games for practice:\n\n"
+            "1. Family Members 👨‍👩‍👧‍👦:\nhttps://wordwall.net/resource/16223990\n\n"
+            "2. Vocabulary Practice 📖:\nhttps://wordwall.net/resource/16581690\n\n"
+            "3. Revision Game ⚡:\nhttps://wordwall.net/ru/resource/74390841"
+        )
+        await update.message.reply_text(games_text)
+        return
 
     elif text == "Quiz 🧠":
         q = get_unique_item(context, QUIZ_DB, "quiz")
         context.user_data.update({"state": "QUIZ", "ans": q["a"], "exp": q["exp"]})
         await update.message.reply_text(f"🧠 *Quiz Time!*\n\n{q['q']}\n\n" + "\n".join(q["o"]), parse_mode="Markdown")
+        return
 
     elif text == "Game 🎮":
         word_obj = get_unique_item(context, WORDS_DB, "words")
@@ -68,21 +84,24 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         shuffled = "".join(random.sample(word, len(word)))
         context.user_data.update({"state": "GAME", "ans": word})
         await update.message.reply_text(f"🎮 *Unscramble the word:* {shuffled}")
+        return
 
     elif text == "Sentence ✍️":
         w = get_unique_item(context, WORDS_DB, "words")["word"]
         context.user_data.update({"state": "SENTENCE", "target": w})
         await update.message.reply_text(f"✍️ *Task:* Write a full sentence using: *{w}*", parse_mode="Markdown")
+        return
 
     elif text == "Listening 🎧":
         w_obj = get_unique_item(context, WORDS_DB, "words")
         word = w_obj["word"]
         tts = gTTS(text=f"The word is {word}", lang='en')
-        tts.save("voice.mp3")
+        audio_stream = io.BytesIO()
+        tts.write_to_fp(audio_stream)
+        audio_stream.seek(0)
         context.user_data.update({"state": "LISTENING", "ans": word.upper()})
-        with open("voice.mp3", "rb") as audio:
-            await update.message.reply_voice(voice=audio, caption="🎧 Listen and type the word:")
-        os.remove("voice.mp3")
+        await update.message.reply_voice(voice=audio_stream, caption="🎧 Listen and type the word:")
+        return
 
     elif text == "True/False ✅":
         w = get_unique_item(context, WORDS_DB, "words")
@@ -90,14 +109,10 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton("True ✅", callback_data="true"), 
                      InlineKeyboardButton("False ❌", callback_data="false")]]
         await update.message.reply_text(f"🧐 *True or False?*\n\n{w['tf_q']}", reply_markup=InlineKeyboardMarkup(keyboard))
-
-    elif text == "Wordwall 🎡":
-        url = "https://wordwall.net/play/12345/678" # Өз сілтемеңізді қойыңыз
-        keyboard = [[InlineKeyboardButton("Open Wordwall 🕹️", url=url)]]
-        await update.message.reply_text("Play interactive games on Wordwall:", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
 
     # --- ЖАУАПТАРДЫ ТЕКСЕРУ (STATE-BASED) ---
-    elif state == "QUIZ":
+    if state == "QUIZ":
         if text.upper().startswith(context.user_data.get("ans")):
             await update.message.reply_text("✅ *Correct!*", parse_mode="Markdown")
         else:
@@ -112,20 +127,13 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["state"] = None
 
     elif state == "SENTENCE":
-        target = context.user_data.get("target").lower()
+        target = context.user_data.get("target", "").lower()
         if target in text.lower() and len(text.split()) >= 3:
             await update.message.reply_text("🌟 *Great sentence!* ✅")
         else:
             await update.message.reply_text(f"⚠️ *Try again!* Use '{target}' in a sentence.")
         context.user_data["state"] = None
-    elif text == "Interactive Games 🎮":
-        games_text = (
-            "Interactive Games for practice:\n\n"
-            "1. Family Members 👨‍👩‍👧‍👦:\nhttps://wordwall.net/resource/16223990\n\n"
-            "2. Vocabulary Practice 📖:\nhttps://wordwall.net/resource/16581690\n\n"
-            "3. Revision Game ⚡:\nhttps://wordwall.net/ru/resource/74390841"
-        )
-        await update.message.reply_text(games_text)
+
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -137,7 +145,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(f"❌ *Wrong!* Think again.", parse_mode="Markdown")
 
 if __name__ == '__main__':
-    app = ApplicationBuilder().token("8713961102:AAEJjLuLvXbea4xN3e7cbbxLQYlIxddxOa8").build()
+    app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_logic))
