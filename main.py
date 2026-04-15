@@ -27,12 +27,10 @@ QUIZ_DB = [
 
 # БІРІКТІРІЛГЕН МӘЗІР
 MENU = ReplyKeyboardMarkup([
-    ["Learn Words 📚", "Quiz 🧠"], 
-    ["Sentence ✍️", "Game 🎮"], 
-    ["Listening 🎧", "True/False ✅"], 
-    ["Wordwall 🎡"]
+    ["Learn Words 📚", "Quiz 🧠"],
+    ["Interactive Games 🎮", "Sentence ✍️"],
+    ["Listening 🎧", "Help ❓"]
 ], resize_keyboard=True)
-
 def get_unique_item(context, db, key):
     used_key = f"used_{key}"
     if used_key not in context.user_data or len(context.user_data[used_key]) >= len(db):
@@ -120,7 +118,14 @@ async def handle_logic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text(f"⚠️ *Try again!* Use '{target}' in a sentence.")
         context.user_data["state"] = None
-
+elif text == "Interactive Games 🎮":
+        games_text = (
+            "Interactive Games for practice:\n\n"
+            "1. Family Members 👨‍👩‍👧‍👦:\nhttps://wordwall.net/resource/16223990\n\n"
+            "2. Vocabulary Practice 📖:\nhttps://wordwall.net/resource/16581690\n\n"
+            "3. Revision Game ⚡:\nhttps://wordwall.net/ru/resource/74390841"
+        )
+        await update.message.reply_text(games_text)
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
